@@ -11,7 +11,6 @@ from pyspark.sql.types import StructType, StringType
 
 # COMMAND ----------
 
-# Config values (from configs/pipeline_config.json)
 API_BASE_URL = "https://pokeapi.co/api/v2"
 POKEMON_LIMIT = 151
 BRONZE_PATH = "dbfs:/pokelakehouse/bronze"
