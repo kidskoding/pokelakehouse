@@ -1,6 +1,7 @@
 # PokéLakehouse — Project Spec for Claude Code
 
 ## What to Build
+
 Scaffold a complete Azure Databricks data engineering portfolio project called `pokelakehouse`.
 The data source is the **PokeAPI** (https://pokeapi.co) — free, no auth required.
 The architecture follows the **medallion pattern**: Bronze → Silver → Gold, orchestrated as a real pipeline.

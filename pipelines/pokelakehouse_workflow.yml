@@ -1,0 +1,44 @@
+# Databricks Asset Bundle - PokeLakehouse Workflow
+# Deploy with: databricks bundle deploy
+# Run with: databricks bundle run pokelakehouse_job
+
+resources:
+  jobs:
+    pokelakehouse_job:
+      name: "pokelakehouse_pipeline"
+
+      tasks:
+        - task_key: bronze_ingest
+          notebook_task:
+            notebook_path: ../notebooks/1_bronze/01_ingest_pokeapi.py
+          # TODO: Configure cluster or job_cluster_key
+
+        - task_key: silver_pokemon
+          depends_on:
+            - task_key: bronze_ingest
+          notebook_task:
+            notebook_path: ../notebooks/2_silver/02_transform_pokemon.py
+          # TODO: Configure cluster
+
+        - task_key: silver_types_abilities
+          depends_on:
+            - task_key: bronze_ingest
+          notebook_task:
+            notebook_path: ../notebooks/2_silver/03_transform_types_abilities.py
+          # TODO: Configure cluster
+
+        - task_key: quality_gate
+          depends_on:
+            - task_key: silver_pokemon
+            - task_key: silver_types_abilities
+          notebook_task:
+            notebook_path: ../notebooks/3_quality/05_data_quality_checks.py
+          # TODO: Configure cluster
+          # CRITICAL: If this fails, gold_build will NOT run
+
+        - task_key: gold_build
+          depends_on:
+            - task_key: quality_gate
+          notebook_task:
+            notebook_path: ../notebooks/4_gold/04_build_star_schema.py
+          # TODO: Configure cluster

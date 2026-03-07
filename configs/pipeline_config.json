@@ -1,0 +1,16 @@
+{
+  "api": {
+    "base_url": "https://pokeapi.co/api/v2",
+    "endpoints": ["pokemon", "type", "ability", "move"],
+    "limit": 151
+  },
+  "storage": {
+    "bronze_path": "dbfs:/pokelakehouse/bronze",
+    "silver_path": "dbfs:/pokelakehouse/silver",
+    "gold_path": "dbfs:/pokelakehouse/gold"
+  },
+  "pipeline": {
+    "batch_size": 50,
+    "enable_quality_gate": true
+  }
+}
