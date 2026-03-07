@@ -11,21 +11,15 @@ from pyspark.sql.types import StructType, StringType
 
 # COMMAND ----------
 
-import os
-from pathlib import Path
+# Config values (from configs/pipeline_config.json)
+API_BASE_URL = "https://pokeapi.co/api/v2"
+POKEMON_LIMIT = 151
+BRONZE_PATH = "dbfs:/pokelakehouse/bronze"
 
-def load_config() -> dict:
-    """Load pipeline config from configs/pipeline_config.json"""
-    notebook_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-    config_path = notebook_dir.parent.parent / "configs" / "pipeline_config.json"
-    with open(config_path) as f:
-        return json.load(f)
-
-config = load_config()
-
-API_BASE_URL = config["api"]["base_url"]
-POKEMON_LIMIT = config["api"]["limit"]
-BRONZE_PATH = config["storage"]["bronze_path"]
+config = {
+    "api": {"base_url": API_BASE_URL, "limit": POKEMON_LIMIT},
+    "storage": {"bronze_path": BRONZE_PATH}
+}
 
 # COMMAND ----------
 
