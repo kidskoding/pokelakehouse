@@ -13,10 +13,12 @@ from pyspark.sql.types import StructType, StringType
 
 # COMMAND ----------
 
+from constants import *
+
+# COMMAND ----------
+
 API_BASE_URL = "https://pokeapi.co/api/v2"
 POKEMON_LIMIT = 151
-CATALOG = "pokelakehouse"
-SCHEMA = "bronze"
 
 # COMMAND ----------
 
@@ -30,7 +32,7 @@ try:
 except Exception:
     pass
 
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}")
 
 # COMMAND ----------
 
@@ -70,7 +72,7 @@ def ingest_pokemon(spark):
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
-    table_name = f"{CATALOG}.{SCHEMA}.pokemon"
+    table_name = BRONZE_POKEMON
     df = spark.createDataFrame(pokemon_records)
     df.write.format("delta").mode("overwrite").saveAsTable(table_name)
     print(f"Ingested {len(pokemon_records)} pokemon to {table_name}")
@@ -101,7 +103,7 @@ def ingest_types(spark):
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
-    table_name = f"{CATALOG}.{SCHEMA}.types"
+    table_name = BRONZE_TYPES
     df = spark.createDataFrame(type_records)
     df.write.format("delta").mode("overwrite").saveAsTable(table_name)
     print(f"Ingested {len(type_records)} types to {table_name}")
@@ -132,7 +134,7 @@ def ingest_abilities(spark):
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
-    table_name = f"{CATALOG}.{SCHEMA}.abilities"
+    table_name = BRONZE_ABILITIES
     df = spark.createDataFrame(ability_records)
     df.write.format("delta").mode("overwrite").saveAsTable(table_name)
     print(f"Ingested {len(ability_records)} abilities to {table_name}")
@@ -155,7 +157,7 @@ if __name__ == "__main__" or "dbutils" in dir():
 
 # DBTITLE 1,Browse all bronze pokemon
 display(spark
-        .table("pokelakehouse.bronze.pokemon")
+        .table(BRONZE_POKEMON)
         .select("pokemon_id", "name", "source_url", "ingestion_timestamp")
         .orderBy("pokemon_id")
         .limit(10))
@@ -163,7 +165,7 @@ display(spark
 # COMMAND ----------
 
 display(spark
-        .table("pokelakehouse.bronze.abilities")
+        .table(BRONZE_ABILITIES)
         .select("ability_id", "name", "source_url", "ingestion_timestamp")
         .orderBy("ability_id")
         .limit(10))
@@ -171,7 +173,7 @@ display(spark
 # COMMAND ----------
 
 display(spark
-        .table("pokelakehouse.bronze.types")
+        .table(BRONZE_TYPES)
         .select("type_id", "name", "source_url", "ingestion_timestamp")
         .orderBy("type_id")
         .limit(10))

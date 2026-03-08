@@ -1,0 +1,14 @@
+# Shared constants for all notebooks
+
+CATALOG = "pokelakehouse"
+BRONZE_SCHEMA = "bronze"
+SILVER_SCHEMA = "silver"
+GOLD_SCHEMA = "gold"
+
+BRONZE_POKEMON = f"{CATALOG}.{BRONZE_SCHEMA}.pokemon"
+BRONZE_TYPES = f"{CATALOG}.{BRONZE_SCHEMA}.types"
+BRONZE_ABILITIES = f"{CATALOG}.{BRONZE_SCHEMA}.abilities"
+
+SILVER_POKEMON = f"{CATALOG}.{SILVER_SCHEMA}.pokemon"
+SILVER_TYPES = f"{CATALOG}.{SILVER_SCHEMA}.types"
+SILVER_ABILITIES = f"{CATALOG}.{SILVER_SCHEMA}.abilities"

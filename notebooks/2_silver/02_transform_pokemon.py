@@ -11,9 +11,7 @@ from datetime import datetime
 
 # COMMAND ----------
 
-CATALOG = "pokelakehouse"
-BRONZE_SCHEMA = "bronze"
-SILVER_SCHEMA = "silver"
+from constants import *
 
 # COMMAND ----------
 
@@ -33,7 +31,7 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}")
 
 def read_bronze_pokemon(spark):
     """Read raw pokemon data from bronze layer and parse JSON."""
-    df = spark.table(f"{CATALOG}.{BRONZE_SCHEMA}.pokemon")
+    df = spark.table(BRONZE_POKEMON)
     # Parse the raw_json column into a struct
     json_schema = spark.read.json(df.select("raw_json").rdd.map(lambda r: r[0])).schema
     df = df.withColumn("parsed", F.from_json(F.col("raw_json"), json_schema))
@@ -152,7 +150,7 @@ def transform_pokemon(spark):
         F.lit(datetime.utcnow().isoformat()).alias("processed_at")
     )
 
-    table_name = f"{CATALOG}.{SILVER_SCHEMA}.pokemon"
+    table_name = SILVER_POKEMON
 
     # Use MERGE for upsert (as per project conventions)
     if spark.catalog.tableExists(table_name):
@@ -193,6 +191,6 @@ if __name__ == "__main__" or "dbutils" in dir():
 # COMMAND ----------
 
 display(spark
-        .table(f"{CATALOG}.{SILVER_SCHEMA}.pokemon")
+        .table(SILVER_POKEMON)
         .orderBy("pokemon_id")
         .limit(10))

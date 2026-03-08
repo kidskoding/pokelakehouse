@@ -11,9 +11,7 @@ from datetime import datetime
 
 # COMMAND ----------
 
-CATALOG = "pokelakehouse"
-BRONZE_SCHEMA = "bronze"
-SILVER_SCHEMA = "silver"
+from constants import *
 
 # COMMAND ----------
 
@@ -33,7 +31,7 @@ def transform_types(spark):
     - Add processed_at
     - Write to silver.types as Delta
     """
-    df = spark.table(f"{CATALOG}.{BRONZE_SCHEMA}.types")
+    df = spark.table(BRONZE_TYPES)
 
     json_schema = spark.read.json(df.select("raw_json").rdd.map(lambda r: r[0])).schema
     df = df.withColumn("parsed", F.from_json(F.col("raw_json"), json_schema))
@@ -52,7 +50,7 @@ def transform_types(spark):
         F.lit(datetime.utcnow().isoformat()).alias("processed_at")
     )
 
-    table_name = f"{CATALOG}.{SILVER_SCHEMA}.types"
+    table_name = SILVER_TYPES
 
     if spark.catalog.tableExists(table_name):
         from delta.tables import DeltaTable
@@ -82,7 +80,7 @@ def transform_abilities(spark):
     - Add processed_at
     - Write to silver.abilities as Delta
     """
-    df = spark.table(f"{CATALOG}.{BRONZE_SCHEMA}.abilities")
+    df = spark.table(BRONZE_ABILITIES)
 
     json_schema = spark.read.json(df.select("raw_json").rdd.map(lambda r: r[0])).schema
     df = df.withColumn("parsed", F.from_json(F.col("raw_json"), json_schema))
@@ -102,7 +100,7 @@ def transform_abilities(spark):
         F.lit(datetime.utcnow().isoformat()).alias("processed_at")
     )
 
-    table_name = f"{CATALOG}.{SILVER_SCHEMA}.abilities"
+    table_name = SILVER_ABILITIES
     if spark.catalog.tableExists(table_name):
         from delta.tables import DeltaTable
         delta_table = DeltaTable.forName(spark, table_name)
@@ -138,13 +136,13 @@ if __name__ == "__main__" or "dbutils" in dir():
 # COMMAND ----------
 
 display(spark
-        .table(f"{CATALOG}.{SILVER_SCHEMA}.types")
+        .table(SILVER_TYPES)
         .orderBy("type_id")
         .limit(10))
 
 # COMMAND ----------
 
 display(spark
-        .table(f"{CATALOG}.{SILVER_SCHEMA}.abilities")
+        .table(SILVER_ABILITIES)
         .orderBy("ability_id")
         .limit(10))
