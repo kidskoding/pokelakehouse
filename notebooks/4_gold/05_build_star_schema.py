@@ -124,11 +124,11 @@ def build_fact_pokemon_stats(spark):
     # Join to get type and ability IDs
     fact = pokemon.alias("p").join(
         types.alias("t1"),
-        F.col("p.primary_type") == F.col("t1.type_name"),
+        F.col("p.type_1") == F.col("t1.type_name"),
         "left"
     ).join(
         types.alias("t2"),
-        F.col("p.secondary_type") == F.col("t2.type_name"),
+        F.col("p.type_2") == F.col("t2.type_name"),
         "left"
     ).join(
         abilities.alias("a1"),

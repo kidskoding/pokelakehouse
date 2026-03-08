@@ -77,18 +77,18 @@ def flatten_stats(df):
 def flatten_types(df):
     """
     Flatten types array into:
-    - primary_type (required)
-    - secondary_type (nullable)
+    - type_1 (required)
+    - type_2 (nullable)
     """
     # Types array structure: [{slot: int, type: {name: str, url: str}}]
     df = df.withColumn("types_array", F.col("parsed.types"))
 
     df = df.withColumn(
-        "primary_type",
+        "type_1",
         F.expr("get(filter(types_array, x -> x.slot = 1), 0).type.name")
     )
     df = df.withColumn(
-        "secondary_type",
+        "type_2",
         F.expr("get(filter(types_array, x -> x.slot = 2), 0).type.name")
     )
 
@@ -149,7 +149,7 @@ def transform_pokemon(spark):
         F.col("parsed.weight").cast(IntegerType()).alias("weight"),
         F.col("parsed.base_experience").cast(IntegerType()).alias("base_experience"),
         "hp", "attack", "defense", "sp_atk", "sp_def", "speed",
-        "primary_type", "secondary_type",
+        "type_1", "type_2",
         "ability_1", "ability_2", "ability_3",
         F.lit(datetime.utcnow().isoformat()).alias("processed_at")
     )
