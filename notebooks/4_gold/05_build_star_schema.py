@@ -149,6 +149,43 @@ def build_fact_pokemon_stats(spark):
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Analytics View: v_pokemon_analytics
+# MAGIC Pre-joined view for Genie, dashboards, and ad-hoc queries
+
+# COMMAND ----------
+
+def build_analytics_view(spark):
+    """
+    Build v_pokemon_analytics:
+    Pre-joins fact + dimensions so analytics tools see names instead of IDs.
+    """
+    spark.sql(f"""
+    CREATE OR REPLACE VIEW {GOLD_V_POKEMON_ANALYTICS} AS
+    SELECT
+        p.pokemon_id,
+        p.name,
+        p.height,
+        p.weight,
+        p.base_experience,
+        f.hp,
+        f.attack,
+        f.defense,
+        f.sp_atk,
+        f.sp_def,
+        f.speed,
+        f.total_base_stats,
+        t1.type_name AS type_1,
+        t2.type_name AS type_2
+    FROM {GOLD_FACT_POKEMON_STATS} f
+    JOIN {GOLD_DIM_POKEMON} p ON f.pokemon_id = p.pokemon_id
+    LEFT JOIN {GOLD_DIM_TYPE} t1 ON f.type_1_id = t1.type_id
+    LEFT JOIN {GOLD_DIM_TYPE} t2 ON f.type_2_id = t2.type_id
+    """)
+    print(f"Built {GOLD_V_POKEMON_ANALYTICS} view")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Run Star Schema Build
 
 # COMMAND ----------
@@ -163,6 +200,9 @@ if __name__ == "__main__" or "dbutils" in dir():
 
     # Build fact table
     build_fact_pokemon_stats(spark)
+
+    # Build analytics view (for Genie/dashboards)
+    build_analytics_view(spark)
 
     print("Gold star schema build complete!")
 
@@ -186,6 +226,15 @@ display(spark.table(GOLD_DIM_POKEMON).orderBy("pokemon_id").limit(10))
 # COMMAND ----------
 
 display(spark.table(GOLD_FACT_POKEMON_STATS).orderBy("pokemon_id").limit(10))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Analytics View (use this for Genie/dashboards)
+
+# COMMAND ----------
+
+display(spark.table(GOLD_V_POKEMON_ANALYTICS).orderBy("pokemon_id").limit(10))
 
 # COMMAND ----------
 
