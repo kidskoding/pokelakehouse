@@ -191,7 +191,7 @@ def build_analytics_view(spark):
 # COMMAND ----------
 
 if __name__ == "__main__" or "dbutils" in dir():
-    print("Building Gold star schema...")
+    print("building Gold star schema...")
 
     # Build dimensions first (fact depends on dim_type)
     build_dim_type(spark)
@@ -204,7 +204,7 @@ if __name__ == "__main__" or "dbutils" in dir():
     # Build analytics view (for Genie/dashboards)
     build_analytics_view(spark)
 
-    print("Gold star schema build complete!")
+    print("gold star schema build complete!")
 
 # COMMAND ----------
 
