@@ -144,7 +144,7 @@ def run_quality_gate(spark):
     results.append(check_row_count(spark, SILVER_ABILITIES, 50))
 
     # 2. No nulls on required columns
-    results.append(check_no_nulls(spark, SILVER_POKEMON, ["pokemon_id", "name", "type_1"]))
+    results.append(check_no_nulls(spark, SILVER_POKEMON, ["pokemon_id", "name", "primary_type"]))
     results.append(check_no_nulls(spark, SILVER_TYPES, ["type_id", "type_name"]))
     results.append(check_no_nulls(spark, SILVER_ABILITIES, ["ability_id", "ability_name"]))
 
@@ -161,8 +161,8 @@ def run_quality_gate(spark):
     results.append(check_no_data_loss(spark, BRONZE_TYPES, SILVER_TYPES))
     results.append(check_no_data_loss(spark, BRONZE_ABILITIES, SILVER_ABILITIES))
 
-    # 6. Referential integrity - pokemon type_1 must exist in types table
-    results.append(check_referential_integrity(spark, SILVER_POKEMON, "type_1", SILVER_TYPES, "type_name"))
+    # 6. Referential integrity - pokemon primary_type must exist in types table
+    results.append(check_referential_integrity(spark, SILVER_POKEMON, "primary_type", SILVER_TYPES, "type_name"))
 
     # Print results
     print("\n" + "-" * 60)

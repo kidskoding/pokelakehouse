@@ -114,7 +114,7 @@ def build_fact_pokemon_stats(spark):
     - pokemon_id (FK to dim_pokemon)
     - hp, attack, defense, sp_atk, sp_def, speed
     - total_base_stats (computed: sum of all 6 stats)
-    - type_1_id, type_2_id (FK to dim_type)
+    - primary_type_id, secondary_type_id (FK to dim_type)
     """
     pokemon = spark.table(SILVER_POKEMON)
     types = spark.table(GOLD_DIM_TYPE)
@@ -122,11 +122,11 @@ def build_fact_pokemon_stats(spark):
     # Join to get type IDs
     fact = pokemon.alias("p").join(
         types.alias("t1"),
-        F.col("p.type_1") == F.col("t1.type_name"),
+        F.col("p.primary_type") == F.col("t1.type_name"),
         "left"
     ).join(
         types.alias("t2"),
-        F.col("p.type_2") == F.col("t2.type_name"),
+        F.col("p.secondary_type") == F.col("t2.type_name"),
         "left"
     ).select(
         F.col("p.pokemon_id"),
@@ -138,8 +138,8 @@ def build_fact_pokemon_stats(spark):
         F.col("p.speed"),
         (F.col("p.hp") + F.col("p.attack") + F.col("p.defense") +
          F.col("p.sp_atk") + F.col("p.sp_def") + F.col("p.speed")).alias("total_base_stats"),
-        F.col("t1.type_id").alias("type_1_id"),
-        F.col("t2.type_id").alias("type_2_id"),
+        F.col("t1.type_id").alias("primary_type_id"),
+        F.col("t2.type_id").alias("secondary_type_id"),
         F.lit(datetime.utcnow().isoformat()).alias("loaded_at")
     )
 
@@ -174,12 +174,12 @@ def build_analytics_view(spark):
         f.sp_def,
         f.speed,
         f.total_base_stats,
-        t1.type_name AS type_1,
-        t2.type_name AS type_2
+        t1.type_name AS primary_type,
+        t2.type_name AS secondary_type
     FROM {GOLD_FACT_POKEMON_STATS} f
     JOIN {GOLD_DIM_POKEMON} p ON f.pokemon_id = p.pokemon_id
-    LEFT JOIN {GOLD_DIM_TYPE} t1 ON f.type_1_id = t1.type_id
-    LEFT JOIN {GOLD_DIM_TYPE} t2 ON f.type_2_id = t2.type_id
+    LEFT JOIN {GOLD_DIM_TYPE} t1 ON f.primary_type_id = t1.type_id
+    LEFT JOIN {GOLD_DIM_TYPE} t2 ON f.secondary_type_id = t2.type_id
     """)
     print(f"Built {GOLD_V_POKEMON_ANALYTICS} view")
 
@@ -265,7 +265,7 @@ display(
 
 display(
     spark.table(GOLD_FACT_POKEMON_STATS).alias("f")
-    .join(spark.table(GOLD_DIM_TYPE).alias("t"), F.col("f.type_1_id") == F.col("t.type_id"))
+    .join(spark.table(GOLD_DIM_TYPE).alias("t"), F.col("f.primary_type_id") == F.col("t.type_id"))
     .groupBy("t.type_name")
     .agg(
         F.round(F.avg("f.total_base_stats"), 1).alias("avg_total"),
@@ -285,7 +285,7 @@ display(
 
 display(
     spark.table(GOLD_FACT_POKEMON_STATS).alias("f")
-    .join(spark.table(GOLD_DIM_TYPE).alias("t"), F.col("f.type_1_id") == F.col("t.type_id"))
+    .join(spark.table(GOLD_DIM_TYPE).alias("t"), F.col("f.primary_type_id") == F.col("t.type_id"))
     .groupBy("t.type_name")
     .count()
     .orderBy(F.desc("count"))
