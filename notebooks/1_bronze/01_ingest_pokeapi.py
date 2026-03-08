@@ -11,14 +11,21 @@ from pyspark.sql.types import StructType, StringType
 
 # COMMAND ----------
 
+# Config
 API_BASE_URL = "https://pokeapi.co/api/v2"
 POKEMON_LIMIT = 151
-BRONZE_PATH = "dbfs:/pokelakehouse/bronze"
+CATALOG = "pokelakehouse"
+SCHEMA = "bronze"
 
-config = {
-    "api": {"base_url": API_BASE_URL, "limit": POKEMON_LIMIT},
-    "storage": {"bronze_path": BRONZE_PATH}
-}
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Setup Unity Catalog
+
+# COMMAND ----------
+
+spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 
 # COMMAND ----------
 
@@ -43,19 +50,9 @@ def fetch_pokemon_details(url: str) -> dict:
 
 # COMMAND ----------
 
-"""
-    Main ingestion for pokemon data.
-    - Fetch all pokemon details
-    - Convert to DataFrame with raw JSON
-    - Add metadata: ingestion_timestamp, source_url
-    - Write to bronze_path/pokemon as Delta
-"""
-def ingest_pokemon(spark, config: dict):
-    base_url = config["api"]["base_url"]
-    limit = config["api"]["limit"]
-    bronze_path = config["storage"]["bronze_path"]
-
-    pokemon_urls = fetch_pokemon_list(base_url, limit)
+def ingest_pokemon(spark):
+    """Fetch all pokemon and write to Unity Catalog bronze.pokemon table."""
+    pokemon_urls = fetch_pokemon_list(API_BASE_URL, POKEMON_LIMIT)
 
     pokemon_records = []
     for url in pokemon_urls:
@@ -68,9 +65,10 @@ def ingest_pokemon(spark, config: dict):
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
+    table_name = f"{CATALOG}.{SCHEMA}.pokemon"
     df = spark.createDataFrame(pokemon_records)
-    df.write.format("delta").mode("overwrite").save(f"{bronze_path}/pokemon")
-    print(f"Ingested {len(pokemon_records)} pokemon to {bronze_path}/pokemon")
+    df.write.format("delta").mode("overwrite").saveAsTable(table_name)
+    print(f"Ingested {len(pokemon_records)} pokemon to {table_name}")
 
 # COMMAND ----------
 
@@ -79,11 +77,9 @@ def ingest_pokemon(spark, config: dict):
 
 # COMMAND ----------
 
-def ingest_types(spark, config: dict):
-    base_url = config["api"]["base_url"]
-    bronze_path = config["storage"]["bronze_path"]
-
-    response = requests.get(f"{base_url}/type")
+def ingest_types(spark):
+    """Fetch all types and write to Unity Catalog bronze.types table."""
+    response = requests.get(f"{API_BASE_URL}/type")
     response.raise_for_status()
     type_list = response.json()["results"]
 
@@ -100,9 +96,10 @@ def ingest_types(spark, config: dict):
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
+    table_name = f"{CATALOG}.{SCHEMA}.types"
     df = spark.createDataFrame(type_records)
-    df.write.format("delta").mode("overwrite").save(f"{bronze_path}/types")
-    print(f"Ingested {len(type_records)} types to {bronze_path}/types")
+    df.write.format("delta").mode("overwrite").saveAsTable(table_name)
+    print(f"Ingested {len(type_records)} types to {table_name}")
 
 # COMMAND ----------
 
@@ -111,16 +108,9 @@ def ingest_types(spark, config: dict):
 
 # COMMAND ----------
 
-"""
-    Ingest /ability endpoint to bronze_path/abilities
-    - Add metadata columns
-    - Write as Delta
-"""
-def ingest_abilities(spark, config: dict):
-    base_url = config["api"]["base_url"]
-    bronze_path = config["storage"]["bronze_path"]
-
-    response = requests.get(f"{base_url}/ability?limit=500")
+def ingest_abilities(spark):
+    """Fetch all abilities and write to Unity Catalog bronze.abilities table."""
+    response = requests.get(f"{API_BASE_URL}/ability?limit=500")
     response.raise_for_status()
     ability_list = response.json()["results"]
 
@@ -137,9 +127,10 @@ def ingest_abilities(spark, config: dict):
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
+    table_name = f"{CATALOG}.{SCHEMA}.abilities"
     df = spark.createDataFrame(ability_records)
-    df.write.format("delta").mode("overwrite").save(f"{bronze_path}/abilities")
-    print(f"Ingested {len(ability_records)} abilities to {bronze_path}/abilities")
+    df.write.format("delta").mode("overwrite").saveAsTable(table_name)
+    print(f"Ingested {len(ability_records)} abilities to {table_name}")
 
 # COMMAND ----------
 
@@ -149,8 +140,8 @@ def ingest_abilities(spark, config: dict):
 # COMMAND ----------
 
 if __name__ == "__main__" or "dbutils" in dir():
-    print("starting Bronze layer ingestion...")
-    ingest_pokemon(spark, config)
-    ingest_types(spark, config)
-    ingest_abilities(spark, config)
-    print("bronze layer ingestion complete!")
+    print("Starting Bronze layer ingestion...")
+    ingest_pokemon(spark)
+    ingest_types(spark)
+    ingest_abilities(spark)
+    print("Bronze layer ingestion complete!")

@@ -5,17 +5,19 @@ An end-to-end data engineering pipeline that ingests Pokémon data from the Poke
 - **Silver** for cleaning and transformation
 - **Gold** for a star schema analytical layer
 
-Built on **Azure Databricks** using Databricks Asset Bundles, Databricks Workflows, PySpark, and Delta Lake, with a data quality gate that blocks the Gold layer if Silver assertions fail.
+Built on **Databricks** using Unity Catalog, Databricks Asset Bundles, Databricks Workflows, PySpark, and Delta Lake, with a data quality gate that blocks the Gold layer if Silver assertions fail.
 
 ## Running in Databricks
 
-> This is designed to run in **Databricks** workspace
+> Requires a **Unity Catalog-enabled** Databricks workspace (Azure, AWS, or GCP)
 
 ### Setup
-1. Create a Databricks workspace (Azure Databricks or Community Edition)
+1. Create a Databricks workspace with Unity Catalog enabled
 2. Go to **Repos** in the sidebar
 3. Click **Add Repo** and paste this repository URL
 4. Databricks will clone the repo into your workspace
+
+The pipeline creates a `pokelakehouse` catalog with `bronze`, `silver`, and `gold` schemas.
 
 ### Running Notebooks Manually
 1. Navigate to any notebook under `notebooks/`

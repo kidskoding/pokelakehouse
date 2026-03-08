@@ -4,10 +4,11 @@
     "endpoints": ["pokemon", "type", "ability", "move"],
     "limit": 151
   },
-  "storage": {
-    "bronze_path": "dbfs:/pokelakehouse/bronze",
-    "silver_path": "dbfs:/pokelakehouse/silver",
-    "gold_path": "dbfs:/pokelakehouse/gold"
+  "unity_catalog": {
+    "catalog": "pokelakehouse",
+    "bronze_schema": "bronze",
+    "silver_schema": "silver",
+    "gold_schema": "gold"
   },
   "pipeline": {
     "batch_size": 50,
