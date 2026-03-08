@@ -4,3 +4,5 @@ __pycache__/
 .databricks/
 dist/
 bundle.yml.lock
+
+.envrc
