@@ -115,11 +115,13 @@ def build_fact_pokemon_stats(spark):
     - hp, attack, defense, sp_atk, sp_def, speed
     - total_base_stats (computed: sum of all 6 stats)
     - primary_type_id, secondary_type_id (FK to dim_type)
+    - primary_ability_id, secondary_ability_id, hidden_ability_id (FK to dim_ability)
     """
     pokemon = spark.table(SILVER_POKEMON)
     types = spark.table(GOLD_DIM_TYPE)
+    abilities = spark.table(GOLD_DIM_ABILITY)
 
-    # Join to get type IDs
+    # Join to get type and ability IDs
     fact = pokemon.alias("p").join(
         types.alias("t1"),
         F.col("p.primary_type") == F.col("t1.type_name"),
@@ -127,6 +129,18 @@ def build_fact_pokemon_stats(spark):
     ).join(
         types.alias("t2"),
         F.col("p.secondary_type") == F.col("t2.type_name"),
+        "left"
+    ).join(
+        abilities.alias("a1"),
+        F.col("p.ability_1") == F.col("a1.ability_name"),
+        "left"
+    ).join(
+        abilities.alias("a2"),
+        F.col("p.ability_2") == F.col("a2.ability_name"),
+        "left"
+    ).join(
+        abilities.alias("a3"),
+        F.col("p.ability_3") == F.col("a3.ability_name"),
         "left"
     ).select(
         F.col("p.pokemon_id"),
@@ -140,6 +154,9 @@ def build_fact_pokemon_stats(spark):
          F.col("p.sp_atk") + F.col("p.sp_def") + F.col("p.speed")).alias("total_base_stats"),
         F.col("t1.type_id").alias("primary_type_id"),
         F.col("t2.type_id").alias("secondary_type_id"),
+        F.col("a1.ability_id").alias("primary_ability_id"),
+        F.col("a2.ability_id").alias("secondary_ability_id"),
+        F.col("a3.ability_id").alias("hidden_ability_id"),
         F.lit(datetime.utcnow().isoformat()).alias("loaded_at")
     )
 
@@ -176,14 +193,16 @@ def build_analytics_view(spark):
         f.total_base_stats,
         t1.type_name AS primary_type,
         t2.type_name AS secondary_type,
-        s.ability_1 AS primary_ability,
-        s.ability_2 AS secondary_ability,
-        s.ability_3 AS hidden_ability
+        a1.ability_name AS primary_ability,
+        a2.ability_name AS secondary_ability,
+        a3.ability_name AS hidden_ability
     FROM {GOLD_FACT_POKEMON_STATS} f
     JOIN {GOLD_DIM_POKEMON} p ON f.pokemon_id = p.pokemon_id
-    JOIN {SILVER_POKEMON} s ON f.pokemon_id = s.pokemon_id
     LEFT JOIN {GOLD_DIM_TYPE} t1 ON f.primary_type_id = t1.type_id
     LEFT JOIN {GOLD_DIM_TYPE} t2 ON f.secondary_type_id = t2.type_id
+    LEFT JOIN {GOLD_DIM_ABILITY} a1 ON f.primary_ability_id = a1.ability_id
+    LEFT JOIN {GOLD_DIM_ABILITY} a2 ON f.secondary_ability_id = a2.ability_id
+    LEFT JOIN {GOLD_DIM_ABILITY} a3 ON f.hidden_ability_id = a3.ability_id
     """)
     print(f"Built {GOLD_V_POKEMON_ANALYTICS} view")
 
