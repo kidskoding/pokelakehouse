@@ -68,7 +68,6 @@ def ingest_pokemon(spark):
             "pokemon_id": details["id"],
             "name": details["name"],
             "raw_json": json.dumps(details),
-            "source_url": url,
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
@@ -99,7 +98,6 @@ def ingest_types(spark):
             "type_id": details["id"],
             "name": details["name"],
             "raw_json": json.dumps(details),
-            "source_url": t["url"],
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
@@ -130,7 +128,6 @@ def ingest_abilities(spark):
             "ability_id": details["id"],
             "name": details["name"],
             "raw_json": json.dumps(details),
-            "source_url": a["url"],
             "ingestion_timestamp": datetime.utcnow().isoformat()
         })
 
@@ -158,7 +155,7 @@ if __name__ == "__main__" or "dbutils" in dir():
 # DBTITLE 1,Browse all bronze pokemon
 display(spark
         .table(BRONZE_POKEMON)
-        .select("pokemon_id", "name", "source_url", "ingestion_timestamp")
+        .select("pokemon_id", "name", "raw_json", "ingestion_timestamp")
         .orderBy("pokemon_id")
         .limit(10))
 
@@ -166,7 +163,7 @@ display(spark
 
 display(spark
         .table(BRONZE_ABILITIES)
-        .select("ability_id", "name", "source_url", "ingestion_timestamp")
+        .select("ability_id", "name", "raw_json", "ingestion_timestamp")
         .orderBy("ability_id")
         .limit(10))
 
@@ -174,6 +171,6 @@ display(spark
 
 display(spark
         .table(BRONZE_TYPES)
-        .select("type_id", "name", "source_url", "ingestion_timestamp")
+        .select("type_id", "name", "raw_json", "ingestion_timestamp")
         .orderBy("type_id")
         .limit(10))
