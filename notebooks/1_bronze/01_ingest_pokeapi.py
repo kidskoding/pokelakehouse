@@ -3,6 +3,8 @@
 # MAGIC # Bronze Layer: Ingest PokeAPI
 # MAGIC Raw JSON ingestion from PokeAPI to Delta tables
 
+# COMMAND ----------
+
 import json
 import requests
 from datetime import datetime
@@ -11,7 +13,6 @@ from pyspark.sql.types import StructType, StringType
 
 # COMMAND ----------
 
-# Config
 API_BASE_URL = "https://pokeapi.co/api/v2"
 POKEMON_LIMIT = 151
 CATALOG = "pokelakehouse"
@@ -24,7 +25,11 @@ SCHEMA = "bronze"
 
 # COMMAND ----------
 
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
+try:
+    spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
+except Exception:
+    pass
+
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 
 # COMMAND ----------
@@ -140,8 +145,8 @@ def ingest_abilities(spark):
 # COMMAND ----------
 
 if __name__ == "__main__" or "dbutils" in dir():
-    print("Starting Bronze layer ingestion...")
+    print("starting Bronze layer ingestion...")
     ingest_pokemon(spark)
     ingest_types(spark)
     ingest_abilities(spark)
-    print("Bronze layer ingestion complete!")
+    print("bronze layer ingestion complete!")
