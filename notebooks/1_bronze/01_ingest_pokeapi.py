@@ -150,3 +150,8 @@ if __name__ == "__main__" or "dbutils" in dir():
     ingest_types(spark)
     ingest_abilities(spark)
     print("bronze layer ingestion complete!")
+
+# COMMAND ----------
+
+# DBTITLE 1,Browse all bronze pokemon
+display(spark.table("pokelakehouse.bronze.pokemon").select("pokemon_id", "name", "source_url", "ingestion_timestamp").orderBy("pokemon_id").limit(10))
