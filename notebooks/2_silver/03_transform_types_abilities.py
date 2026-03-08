@@ -31,9 +31,19 @@ def transform_types(spark):
     - Add processed_at
     - Write to silver.types as Delta
     """
+    import re
     df = spark.table(BRONZE_TYPES)
 
-    json_schema = spark.read.json(df.select("raw_json").rdd.map(lambda r: r[0])).schema
+    # Use the longest JSON sample for robust schema inference
+    json_samples = [r[0] for r in df.select("raw_json").limit(20).collect()]
+    json_sample = max(json_samples, key=len)
+    json_schema = spark.range(1).select(F.schema_of_json(F.lit(json_sample))).collect()[0][0]
+    # Fix damage_relations arrays inferred as ARRAY<STRING> due to empty arrays in sample
+    json_schema = re.sub(
+        r'(double_damage_from|double_damage_to|half_damage_from|half_damage_to|no_damage_from|no_damage_to): ARRAY<STRING>',
+        r'\1: ARRAY<STRUCT<name: STRING, url: STRING>>',
+        json_schema
+    )
     df = df.withColumn("parsed", F.from_json(F.col("raw_json"), json_schema))
 
     df = df.select(
@@ -82,7 +92,10 @@ def transform_abilities(spark):
     """
     df = spark.table(BRONZE_ABILITIES)
 
-    json_schema = spark.read.json(df.select("raw_json").rdd.map(lambda r: r[0])).schema
+    # Use the longest JSON sample for robust schema inference (avoids empty arrays)
+    json_samples = [r[0] for r in df.select("raw_json").limit(20).collect()]
+    json_sample = max(json_samples, key=len)
+    json_schema = spark.range(1).select(F.schema_of_json(F.lit(json_sample))).collect()[0][0]
     df = df.withColumn("parsed", F.from_json(F.col("raw_json"), json_schema))
 
     df = df.select(
@@ -90,10 +103,10 @@ def transform_abilities(spark):
         F.col("parsed.name").alias("ability_name"),
         
         F.expr("""
-            filter(parsed.effect_entries, x -> x.language.name = 'en')[0].short_effect
+            get(filter(parsed.effect_entries, x -> x.language.name = 'en'), 0).short_effect
         """).alias("effect_short"),
         F.expr("""
-            filter(parsed.flavor_text_entries, x -> x.language.name = 'en')[0].flavor_text
+            get(filter(parsed.flavor_text_entries, x -> x.language.name = 'en'), 0).flavor_text
         """).alias("flavor_text"),
         
         F.col("parsed.is_main_series").cast(BooleanType()).alias("is_main_series"),
