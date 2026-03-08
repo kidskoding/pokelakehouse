@@ -1,39 +1,123 @@
-# pokelakehouse
+# PokeLakehouse
 
-An end-to-end data engineering pipeline that ingests Pokémon data from the PokeAPI through a medallion architecture:
-- **Bronze** for raw ingestion
-- **Silver** for cleaning and transformation
-- **Gold** for a star schema analytical layer
+A data engineering portfolio project demonstrating production-grade patterns using Pokemon data.
 
-Built on **Databricks** using Unity Catalog, Databricks Asset Bundles, Databricks Workflows, PySpark, and Delta Lake, with a data quality gate that blocks the Gold layer if Silver assertions fail.
+## Architecture
 
-## Running in Databricks
+```
+PokeAPI (REST)
+     |
+     v
++----------+     +----------+     +--------------+     +----------+
+|  Bronze  | --> |  Silver  | --> | Quality Gate | --> |   Gold   |
+|  (raw)   |     | (cleaned)|     | (assertions) |     |  (star)  |
++----------+     +----------+     +--------------+     +----------+
+                                         |
+                                    Fails? Stop.
+                                         |
+                                         v
+                              Analytics View (Genie/Dashboards)
+```
 
-> Requires a **Unity Catalog-enabled** Databricks workspace (Azure, AWS, or GCP)
+## Tech Stack
 
-### Setup
-1. Create a Databricks workspace with Unity Catalog enabled
-2. Go to **Repos** in the sidebar
-3. Click **Add Repo** and paste this repository URL
-4. Databricks will clone the repo into your workspace
+| Component | Technology |
+|-----------|------------|
+| Platform | Azure Databricks |
+| Storage | Delta Lake |
+| Processing | PySpark |
+| Orchestration | Databricks Workflows |
+| Deployment | Databricks Asset Bundles |
+| CI/CD | GitHub Actions |
+| Data Source | [PokeAPI](https://pokeapi.co/) |
 
-The pipeline creates a `pokelakehouse` catalog with `bronze`, `silver`, and `gold` schemas.
+## Project Structure
 
-### Running Notebooks Manually
-1. Navigate to any notebook under `notebooks/`
-2. Attach to a cluster (Runtime 13.0+ with Python and PySpark)
-3. Click **Run All** or run cells individually
+```
+pokelakehouse/
+├── notebooks/
+│   ├── 1_bronze/
+│   │   └── 01_ingest_pokeapi.py      # Fetch raw JSON from API
+│   ├── 2_silver/
+│   │   ├── 02_transform_pokemon.py   # Flatten pokemon data
+│   │   └── 03_transform_types_abilities.py
+│   ├── 3_quality/
+│   │   └── 04_data_quality_checks.py # Assertions before gold
+│   └── 4_gold/
+│       └── 05_build_star_schema.py   # Fact + dimension tables
+├── pipelines/
+│   └── pokelakehouse_workflow.yml    # Databricks job definition
+├── .github/workflows/
+│   └── deploy.yml                    # Auto-deploy on push
+├── databricks.yml                    # Bundle config
+└── constants.py                      # Shared table names
+```
 
-Run notebooks in order:
-1. `1_bronze/01_ingest_pokeapi.py` - Ingest raw data from PokeAPI
-2. `2_silver/02_transform_pokemon.py` - Clean and flatten pokemon data
-3. `2_silver/03_transform_types_abilities.py` - Clean types and abilities
-4. `3_quality/05_data_quality_checks.py` - Run quality assertions
-5. `4_gold/04_build_star_schema.py` - Build star schema for analytics
+## Data Model
 
-### Running via Databricks Workflows
-Deploy and run the full pipeline using Databricks Asset Bundles:
+### Silver Layer (Cleaned)
+- `silver.pokemon` - Flattened stats, types, abilities
+- `silver.types` - Type names and damage relations
+- `silver.abilities` - Ability names and effects
+
+### Gold Layer (Star Schema)
+- `fact_pokemon_stats` - Stats + FK to dimensions
+- `dim_pokemon` - Pokemon attributes
+- `dim_type` - Type lookup
+- `dim_ability` - Ability lookup
+- `v_pokemon_analytics` - Pre-joined view for dashboards
+
+## Pipeline Flow
+
+```
+bronze_ingest
+      |
+      v
++-----+-----+
+|           |
+v           v
+silver_pokemon    silver_types_abilities
+|           |
++-----+-----+
+      |
+      v
+quality_gate  <-- Fails = pipeline stops
+      |
+      v
+gold_build
+```
+
+## Quick Start
+
+### Prerequisites
+- Databricks workspace with Unity Catalog
+- [Databricks CLI](https://docs.databricks.com/dev-tools/cli/index.html) installed
+
+### Deploy & Run
 ```bash
+# Configure CLI
+export DATABRICKS_HOST=https://your-workspace.azuredatabricks.net
+export DATABRICKS_TOKEN=your-token
+
+# Deploy
 databricks bundle deploy
+
+# Run pipeline
 databricks bundle run pokelakehouse_job
 ```
+
+### CI/CD
+Push to `master` triggers auto-deploy via GitHub Actions.
+
+Required secrets in GitHub:
+- `DATABRICKS_HOST`
+- `DATABRICKS_TOKEN`
+
+## Key Patterns Demonstrated
+
+- **Medallion Architecture** - Bronze/Silver/Gold layers
+- **Delta Lake** - ACID transactions, schema enforcement
+- **Quality Gates** - Assertions block downstream if data is bad
+- **Star Schema** - Fact + dimension tables for analytics
+- **CI/CD** - GitHub Actions auto-deploy
+- **Asset Bundles** - Infrastructure as code for Databricks
