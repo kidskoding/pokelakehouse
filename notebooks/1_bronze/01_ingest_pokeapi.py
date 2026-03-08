@@ -162,8 +162,4 @@ display(spark.table("pokelakehouse.bronze.abilities").select("ability_id", "name
 
 # COMMAND ----------
 
-display(spark.table("pokelakehouse.bronze.abilities").select("ability_id", "name", "source_url", "ingestion_timestamp").orderBy("ability_id").limit(10))
-
-# COMMAND ----------
-
 display(spark.table("pokelakehouse.bronze.types").select("type_id", "name", "source_url", "ingestion_timestamp").orderBy("type_id").limit(10))
