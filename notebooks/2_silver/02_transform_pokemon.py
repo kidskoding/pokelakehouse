@@ -11,9 +11,18 @@ from datetime import datetime
 
 # COMMAND ----------
 
-# Load config
-# TODO: Read from configs/pipeline_config.json
-config = None
+CATALOG = "pokelakehouse"
+BRONZE_SCHEMA = "bronze"
+SILVER_SCHEMA = "silver"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Setup Silver Schema
+
+# COMMAND ----------
+
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}")
 
 # COMMAND ----------
 
@@ -22,10 +31,13 @@ config = None
 
 # COMMAND ----------
 
-def read_bronze_pokemon(spark, bronze_path: str):
-    """Read raw pokemon data from bronze layer"""
-    # TODO: Read Delta table from bronze_path/pokemon
-    pass
+def read_bronze_pokemon(spark):
+    """Read raw pokemon data from bronze layer and parse JSON."""
+    df = spark.table(f"{CATALOG}.{BRONZE_SCHEMA}.pokemon")
+    # Parse the raw_json column into a struct
+    json_schema = spark.read.json(df.select("raw_json").rdd.map(lambda r: r[0])).schema
+    df = df.withColumn("parsed", F.from_json(F.col("raw_json"), json_schema))
+    return df
 
 # COMMAND ----------
 
@@ -37,10 +49,22 @@ def read_bronze_pokemon(spark, bronze_path: str):
 def flatten_stats(df):
     """
     Flatten stats array into individual columns:
-    - hp, attack, defense, special_attack, special_defense, speed
+    - hp, attack, defense, sp_atk, sp_def, speed
     """
-    # TODO: Extract each stat from the stats array
-    pass
+    # Stats array structure: [{base_stat: int, stat: {name: str}}]
+    # Extract each stat by filtering on stat.name
+    df = df.withColumn("stats_array", F.col("parsed.stats"))
+
+    stat_names = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"]
+    col_names = ["hp", "attack", "defense", "sp_atk", "sp_def", "speed"]
+
+    for stat_name, col_name in zip(stat_names, col_names):
+        df = df.withColumn(
+            col_name,
+            F.expr(f"filter(stats_array, x -> x.stat.name = '{stat_name}')[0].base_stat").cast(IntegerType())
+        )
+
+    return df.drop("stats_array")
 
 # COMMAND ----------
 
@@ -55,8 +79,19 @@ def flatten_types(df):
     - type_1 (required)
     - type_2 (nullable)
     """
-    # TODO: Extract type_1 and type_2 from types array
-    pass
+    # Types array structure: [{slot: int, type: {name: str, url: str}}]
+    df = df.withColumn("types_array", F.col("parsed.types"))
+
+    df = df.withColumn(
+        "type_1",
+        F.expr("filter(types_array, x -> x.slot = 1)[0].type.name")
+    )
+    df = df.withColumn(
+        "type_2",
+        F.expr("filter(types_array, x -> x.slot = 2)[0].type.name")
+    )
+
+    return df.drop("types_array")
 
 # COMMAND ----------
 
@@ -70,8 +105,16 @@ def flatten_abilities(df):
     Flatten abilities array into:
     - ability_1, ability_2, ability_3 (all nullable except ability_1)
     """
-    # TODO: Extract abilities from abilities array
-    pass
+    # Abilities array structure: [{ability: {name: str}, is_hidden: bool, slot: int}]
+    df = df.withColumn("abilities_array", F.col("parsed.abilities"))
+
+    for slot in [1, 2, 3]:
+        df = df.withColumn(
+            f"ability_{slot}",
+            F.expr(f"filter(abilities_array, x -> x.slot = {slot})[0].ability.name")
+        )
+
+    return df.drop("abilities_array")
 
 # COMMAND ----------
 
@@ -80,18 +123,55 @@ def flatten_abilities(df):
 
 # COMMAND ----------
 
-def transform_pokemon(spark, config: dict):
+def transform_pokemon(spark):
     """
     Main transformation pipeline:
     1. Read bronze pokemon
     2. Flatten stats, types, abilities
-    3. Cast types correctly
-    4. Deduplicate on pokemon_id
-    5. Add silver_processed_at timestamp
-    6. Write to silver_path/pokemon as Delta (overwrite)
+    3. Add processed_at timestamp
+    4. Write to silver.pokemon as Delta with MERGE
     """
-    # TODO: Implement full transformation pipeline
-    pass
+    # Read and parse bronze data
+    df = read_bronze_pokemon(spark)
+
+    # Flatten nested structures
+    df = flatten_stats(df)
+    df = flatten_types(df)
+    df = flatten_abilities(df)
+
+    # Select final columns
+    df = df.select(
+        F.col("pokemon_id"),
+        F.col("parsed.name").alias("name"),
+        F.col("parsed.height").cast(IntegerType()).alias("height"),
+        F.col("parsed.weight").cast(IntegerType()).alias("weight"),
+        F.col("parsed.base_experience").cast(IntegerType()).alias("base_experience"),
+        "hp", "attack", "defense", "sp_atk", "sp_def", "speed",
+        "type_1", "type_2",
+        "ability_1", "ability_2", "ability_3",
+        F.lit(datetime.utcnow().isoformat()).alias("processed_at")
+    )
+
+    table_name = f"{CATALOG}.{SILVER_SCHEMA}.pokemon"
+
+    # Use MERGE for upsert (as per project conventions)
+    if spark.catalog.tableExists(table_name):
+        from delta.tables import DeltaTable
+        delta_table = DeltaTable.forName(spark, table_name)
+
+        delta_table.alias("target").merge(
+            df.alias("source"),
+            "target.pokemon_id = source.pokemon_id"
+        ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+
+        print(f"Merged {df.count()} records into {table_name}")
+    else:
+        df.write.format("delta").saveAsTable(table_name)
+        print(f"Created {table_name} with {df.count()} records")
+
+    # Z-ORDER by pokemon_id for query performance
+    spark.sql(f"OPTIMIZE {table_name} ZORDER BY (pokemon_id)")
+    print(f"Applied Z-ORDER on pokemon_id")
 
 # COMMAND ----------
 
@@ -100,6 +180,19 @@ def transform_pokemon(spark, config: dict):
 
 # COMMAND ----------
 
-if __name__ == "__main__" or dbutils:
-    # TODO: Call transform_pokemon(spark, config)
-    pass
+if __name__ == "__main__" or "dbutils" in dir():
+    print("Starting Silver pokemon transformation...")
+    transform_pokemon(spark)
+    print("Silver pokemon transformation complete!")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Preview Silver Data
+
+# COMMAND ----------
+
+display(spark
+        .table(f"{CATALOG}.{SILVER_SCHEMA}.pokemon")
+        .orderBy("pokemon_id")
+        .limit(10))

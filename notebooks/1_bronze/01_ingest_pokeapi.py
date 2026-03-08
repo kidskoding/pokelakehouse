@@ -154,12 +154,24 @@ if __name__ == "__main__" or "dbutils" in dir():
 # COMMAND ----------
 
 # DBTITLE 1,Browse all bronze pokemon
-display(spark.table("pokelakehouse.bronze.pokemon").select("pokemon_id", "name", "source_url", "ingestion_timestamp").orderBy("pokemon_id").limit(10))
+display(spark
+        .table("pokelakehouse.bronze.pokemon")
+        .select("pokemon_id", "name", "source_url", "ingestion_timestamp")
+        .orderBy("pokemon_id")
+        .limit(10))
 
 # COMMAND ----------
 
-display(spark.table("pokelakehouse.bronze.abilities").select("ability_id", "name", "source_url", "ingestion_timestamp").orderBy("ability_id").limit(10))
+display(spark
+        .table("pokelakehouse.bronze.abilities")
+        .select("ability_id", "name", "source_url", "ingestion_timestamp")
+        .orderBy("ability_id")
+        .limit(10))
 
 # COMMAND ----------
 
-display(spark.table("pokelakehouse.bronze.types").select("type_id", "name", "source_url", "ingestion_timestamp").orderBy("type_id").limit(10))
+display(spark
+        .table("pokelakehouse.bronze.types")
+        .select("type_id", "name", "source_url", "ingestion_timestamp")
+        .orderBy("type_id")
+        .limit(10))

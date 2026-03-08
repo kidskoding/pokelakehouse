@@ -1,7 +1,7 @@
 [project]
 name = "pokelakehouse"
 version = "0.1.0"
-description = "Add your description here"
+description = "a data pipeline that ingests pokemon api data via Azure Databricks using a medallion architecture format (bronze -> silver -> gold)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
