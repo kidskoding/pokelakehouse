@@ -32,9 +32,12 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}")
 def read_bronze_pokemon(spark):
     """Read raw pokemon data from bronze layer and parse JSON."""
     df = spark.table(BRONZE_POKEMON)
-    # Parse the raw_json column into a struct
-    json_schema = spark.read.json(df.select("raw_json").rdd.map(lambda r: r[0])).schema
+
+    json_sample = df.select("raw_json").limit(1).collect()[0][0]
+    json_schema = F.schema_of_json(F.lit(json_sample))
+    
     df = df.withColumn("parsed", F.from_json(F.col("raw_json"), json_schema))
+    
     return df
 
 # COMMAND ----------
@@ -59,7 +62,7 @@ def flatten_stats(df):
     for stat_name, col_name in zip(stat_names, col_names):
         df = df.withColumn(
             col_name,
-            F.expr(f"filter(stats_array, x -> x.stat.name = '{stat_name}')[0].base_stat").cast(IntegerType())
+            F.expr(f"get(filter(stats_array, x -> x.stat.name = '{stat_name}'), 0).base_stat").cast(IntegerType())
         )
 
     return df.drop("stats_array")
@@ -82,11 +85,11 @@ def flatten_types(df):
 
     df = df.withColumn(
         "type_1",
-        F.expr("filter(types_array, x -> x.slot = 1)[0].type.name")
+        F.expr("get(filter(types_array, x -> x.slot = 1), 0).type.name")
     )
     df = df.withColumn(
         "type_2",
-        F.expr("filter(types_array, x -> x.slot = 2)[0].type.name")
+        F.expr("get(filter(types_array, x -> x.slot = 2), 0).type.name")
     )
 
     return df.drop("types_array")
@@ -109,7 +112,7 @@ def flatten_abilities(df):
     for slot in [1, 2, 3]:
         df = df.withColumn(
             f"ability_{slot}",
-            F.expr(f"filter(abilities_array, x -> x.slot = {slot})[0].ability.name")
+            F.expr(f"get(filter(abilities_array, x -> x.slot = {slot}), 0).ability.name")
         )
 
     return df.drop("abilities_array")
@@ -129,6 +132,7 @@ def transform_pokemon(spark):
     3. Add processed_at timestamp
     4. Write to silver.pokemon as Delta with MERGE
     """
+    
     # Read and parse bronze data
     df = read_bronze_pokemon(spark)
 
@@ -179,9 +183,9 @@ def transform_pokemon(spark):
 # COMMAND ----------
 
 if __name__ == "__main__" or "dbutils" in dir():
-    print("Starting Silver pokemon transformation...")
+    print("starting Silver pokemon transformation...")
     transform_pokemon(spark)
-    print("Silver pokemon transformation complete!")
+    print("silver pokemon transformation complete!")
 
 # COMMAND ----------
 
