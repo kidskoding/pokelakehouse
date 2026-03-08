@@ -175,9 +175,13 @@ def build_analytics_view(spark):
         f.speed,
         f.total_base_stats,
         t1.type_name AS primary_type,
-        t2.type_name AS secondary_type
+        t2.type_name AS secondary_type,
+        s.ability_1 AS primary_ability,
+        s.ability_2 AS secondary_ability,
+        s.ability_3 AS hidden_ability
     FROM {GOLD_FACT_POKEMON_STATS} f
     JOIN {GOLD_DIM_POKEMON} p ON f.pokemon_id = p.pokemon_id
+    JOIN {SILVER_POKEMON} s ON f.pokemon_id = s.pokemon_id
     LEFT JOIN {GOLD_DIM_TYPE} t1 ON f.primary_type_id = t1.type_id
     LEFT JOIN {GOLD_DIM_TYPE} t2 ON f.secondary_type_id = t2.type_id
     """)
