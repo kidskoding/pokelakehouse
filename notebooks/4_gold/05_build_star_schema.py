@@ -6,49 +6,20 @@
 # COMMAND ----------
 
 from pyspark.sql import functions as F
+from datetime import datetime
 
 # COMMAND ----------
 
-# Load config
-# TODO: Read from configs/pipeline_config.json
-config = None
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Fact Table: fact_pokemon_stats
-
-# COMMAND ----------
-
-def build_fact_pokemon_stats(spark, config: dict):
-    """
-    Build fact_pokemon_stats:
-    - pokemon_id, name
-    - hp, attack, defense, special_attack, special_defense, speed
-    - total_base_stats (computed: sum of all 6 stats)
-    - type_1_id, type_2_id (foreign keys)
-
-    Write to gold_path/fact_pokemon_stats as Delta
-    """
-    # TODO: Build fact table from silver pokemon
-    pass
+from constants import *
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Dimension: dim_pokemon
+# MAGIC ## Setup Gold Schema
 
 # COMMAND ----------
 
-def build_dim_pokemon(spark, config: dict):
-    """
-    Build dim_pokemon:
-    - pokemon_id, name, height, weight, base_experience
-
-    Write to gold_path/dim_pokemon as Delta
-    """
-    # TODO: Build pokemon dimension
-    pass
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{GOLD_SCHEMA}")
 
 # COMMAND ----------
 
@@ -57,15 +28,22 @@ def build_dim_pokemon(spark, config: dict):
 
 # COMMAND ----------
 
-def build_dim_type(spark, config: dict):
+def build_dim_type(spark):
     """
     Build dim_type:
-    - type_id, type_name
-
-    Write to gold_path/dim_type as Delta
+    - type_id (surrogate key)
+    - type_name
     """
-    # TODO: Build type dimension
-    pass
+    df = spark.table(SILVER_TYPES)
+
+    dim = df.select(
+        F.col("type_id"),
+        F.col("type_name"),
+        F.lit(datetime.utcnow().isoformat()).alias("loaded_at")
+    )
+
+    dim.write.format("delta").mode("overwrite").saveAsTable(GOLD_DIM_TYPE)
+    print(f"Built {GOLD_DIM_TYPE} with {dim.count()} records")
 
 # COMMAND ----------
 
@@ -74,15 +52,99 @@ def build_dim_type(spark, config: dict):
 
 # COMMAND ----------
 
-def build_dim_ability(spark, config: dict):
+def build_dim_ability(spark):
     """
     Build dim_ability:
-    - ability_id, ability_name, is_hidden
-
-    Write to gold_path/dim_ability as Delta
+    - ability_id
+    - ability_name
+    - is_main_series
     """
-    # TODO: Build ability dimension
-    pass
+    df = spark.table(SILVER_ABILITIES)
+
+    dim = df.select(
+        F.col("ability_id"),
+        F.col("ability_name"),
+        F.col("is_main_series"),
+        F.lit(datetime.utcnow().isoformat()).alias("loaded_at")
+    )
+
+    dim.write.format("delta").mode("overwrite").saveAsTable(GOLD_DIM_ABILITY)
+    print(f"Built {GOLD_DIM_ABILITY} with {dim.count()} records")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Dimension: dim_pokemon
+
+# COMMAND ----------
+
+def build_dim_pokemon(spark):
+    """
+    Build dim_pokemon:
+    - pokemon_id
+    - name
+    - height
+    - weight
+    - base_experience
+    """
+    df = spark.table(SILVER_POKEMON)
+
+    dim = df.select(
+        F.col("pokemon_id"),
+        F.col("name"),
+        F.col("height"),
+        F.col("weight"),
+        F.col("base_experience"),
+        F.lit(datetime.utcnow().isoformat()).alias("loaded_at")
+    )
+
+    dim.write.format("delta").mode("overwrite").saveAsTable(GOLD_DIM_POKEMON)
+    print(f"Built {GOLD_DIM_POKEMON} with {dim.count()} records")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Fact Table: fact_pokemon_stats
+
+# COMMAND ----------
+
+def build_fact_pokemon_stats(spark):
+    """
+    Build fact_pokemon_stats:
+    - pokemon_id (FK to dim_pokemon)
+    - hp, attack, defense, sp_atk, sp_def, speed
+    - total_base_stats (computed: sum of all 6 stats)
+    - type_1_id, type_2_id (FK to dim_type)
+    """
+    pokemon = spark.table(SILVER_POKEMON)
+    types = spark.table(GOLD_DIM_TYPE)
+
+    # Join to get type IDs
+    fact = pokemon.alias("p").join(
+        types.alias("t1"),
+        F.col("p.type_1") == F.col("t1.type_name"),
+        "left"
+    ).join(
+        types.alias("t2"),
+        F.col("p.type_2") == F.col("t2.type_name"),
+        "left"
+    ).select(
+        F.col("p.pokemon_id"),
+        F.col("p.hp"),
+        F.col("p.attack"),
+        F.col("p.defense"),
+        F.col("p.sp_atk"),
+        F.col("p.sp_def"),
+        F.col("p.speed"),
+        (F.col("p.hp") + F.col("p.attack") + F.col("p.defense") +
+         F.col("p.sp_atk") + F.col("p.sp_def") + F.col("p.speed")).alias("total_base_stats"),
+        F.col("t1.type_id").alias("type_1_id"),
+        F.col("t2.type_id").alias("type_2_id"),
+        F.lit(datetime.utcnow().isoformat()).alias("loaded_at")
+    )
+
+    fact.write.format("delta").mode("overwrite").saveAsTable(GOLD_FACT_POKEMON_STATS)
+    print(f"Built {GOLD_FACT_POKEMON_STATS} with {fact.count()} records")
 
 # COMMAND ----------
 
@@ -91,26 +153,91 @@ def build_dim_ability(spark, config: dict):
 
 # COMMAND ----------
 
-if __name__ == "__main__" or dbutils:
-    # TODO: Call all build functions
-    # build_fact_pokemon_stats(spark, config)
-    # build_dim_pokemon(spark, config)
-    # build_dim_type(spark, config)
-    # build_dim_ability(spark, config)
-    pass
+if __name__ == "__main__" or "dbutils" in dir():
+    print("Building Gold star schema...")
+
+    # Build dimensions first (fact depends on dim_type)
+    build_dim_type(spark)
+    build_dim_ability(spark)
+    build_dim_pokemon(spark)
+
+    # Build fact table
+    build_fact_pokemon_stats(spark)
+
+    print("Gold star schema build complete!")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Preview Gold Tables
+
+# COMMAND ----------
+
+display(spark.table(GOLD_DIM_TYPE).orderBy("type_id").limit(10))
+
+# COMMAND ----------
+
+display(spark.table(GOLD_DIM_ABILITY).orderBy("ability_id").limit(10))
+
+# COMMAND ----------
+
+display(spark.table(GOLD_DIM_POKEMON).orderBy("pokemon_id").limit(10))
+
+# COMMAND ----------
+
+display(spark.table(GOLD_FACT_POKEMON_STATS).orderBy("pokemon_id").limit(10))
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Example Analytical Queries
-# MAGIC
-# MAGIC ```sql
-# MAGIC -- 1. Top 10 Pokemon by total base stats
-# MAGIC -- TODO: Write query
-# MAGIC
-# MAGIC -- 2. Average attack by type
-# MAGIC -- TODO: Write query
-# MAGIC
-# MAGIC -- 3. Count of Pokemon per type
-# MAGIC -- TODO: Write query
-# MAGIC ```
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Top 10 Pokemon by Total Base Stats
+
+# COMMAND ----------
+
+display(
+    spark.table(GOLD_FACT_POKEMON_STATS).alias("f")
+    .join(spark.table(GOLD_DIM_POKEMON).alias("d"), "pokemon_id")
+    .select("d.name", "f.total_base_stats", "f.hp", "f.attack", "f.defense", "f.sp_atk", "f.sp_def", "f.speed")
+    .orderBy(F.desc("total_base_stats"))
+    .limit(10)
+)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Average Stats by Type
+
+# COMMAND ----------
+
+display(
+    spark.table(GOLD_FACT_POKEMON_STATS).alias("f")
+    .join(spark.table(GOLD_DIM_TYPE).alias("t"), F.col("f.type_1_id") == F.col("t.type_id"))
+    .groupBy("t.type_name")
+    .agg(
+        F.round(F.avg("f.total_base_stats"), 1).alias("avg_total"),
+        F.round(F.avg("f.attack"), 1).alias("avg_attack"),
+        F.round(F.avg("f.defense"), 1).alias("avg_defense"),
+        F.count("*").alias("count")
+    )
+    .orderBy(F.desc("avg_total"))
+)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Pokemon Count by Primary Type
+
+# COMMAND ----------
+
+display(
+    spark.table(GOLD_FACT_POKEMON_STATS).alias("f")
+    .join(spark.table(GOLD_DIM_TYPE).alias("t"), F.col("f.type_1_id") == F.col("t.type_id"))
+    .groupBy("t.type_name")
+    .count()
+    .orderBy(F.desc("count"))
+)
