@@ -1,9 +1,6 @@
 bundle:
   name: pokelakehouse
 
-workspace:
-  host: ${DATABRICKS_HOST}
-
 include:
   - pipelines/*.yml
 
